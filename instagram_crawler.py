@@ -4,8 +4,8 @@ from typing import List
 
 import typer
 from PIL import Image
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -16,8 +16,7 @@ app = typer.Typer()
 
 
 @app.command()
-def get_profile(users: List[str], driver=None):
-
+def get_profile(users: List[str], post_count, driver=None):
     if not driver:
         driver = use_driver()
 
@@ -45,14 +44,31 @@ def get_profile(users: List[str], driver=None):
             driver.quit()
             exit()
 
-        page_source = driver.page_source
-        soup = BeautifulSoup(page_source, 'html.parser')
-
-        # Extract bio from section
-        bio = soup.find("section", {"class": f"{bio_class}"}).text
+        bio = driver.find_element(By.XPATH, f"//section[@class='{bio_class}']").get_attribute("innerText")
         image_path = f"{user_id}.png"
-        image_url = soup.find('img', alt=profile_photo_elm).get("src") if (
-            soup.find('img', alt=profile_photo_elm)) else "Image not found"
+        image_url = (driver.find_element(
+            By.XPATH,
+            f"""//img[@alt="{profile_photo_elm}"]""")
+                     .get_attribute("src"))
+        try:
+            (WebDriverWait(driver, 3)
+             .until(EC.presence_of_element_located(
+                (By.XPATH,
+                "//div[@class='_aagv']/img"))))
+            print(f"Gettin {user_id}'s posts")
+            posts = driver.find_elements(
+                By.XPATH,
+                "//div[@class='_aagv']/img")
+            post_alts = []
+        except NoSuchElementException:
+            print(f"{user_id} has no posts or none found")
+        else:
+            # Reset the post to get the amount you want than, get them
+            posts = posts[:post_count]
+            for i, img in enumerate(posts):
+                WebDriverWait(driver, 2).until(EC.element_to_be_clickable(img))
+                img.screenshot(f"p{i}_{image_path}")
+                post_alts.append(img.get_attribute("alt"))
         if "https" in image_url:
             try:
                 driver.get(image_url)
@@ -66,12 +82,15 @@ def get_profile(users: List[str], driver=None):
             except Exception as e:
                 print(f"Failed to take or resize screenshot: {e}")
 
-        generate_file(user_id, file_name, [user_id, image_path, bio])
+        generate_file(
+            user_id,
+            file_name,
+            [image_path, bio, True])
     driver.quit()
 
 
 @app.command()
-def login(users: List[str]):
+def login(users: List[str], post_count: int):
     load_dotenv()
 
     username = os.getenv("INSTAGRAM_USERNAME")
@@ -82,35 +101,39 @@ def login(users: List[str]):
 
     print("Waiting for page to load...")
 
-    driver.get(url)
+    try:
+        # Open the webpage
+        driver.get(url)
 
-    if driver.current_url == url:
-        # Login to instagram
-        username_field = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.NAME, "username"))  # Adjust selector as needed
-        )
-        username_field.send_keys(username)
+        if driver.current_url == url:
+            # Login to instagram
+            username_field = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.NAME, "username"))
+            )
+            username_field.send_keys(username)
 
-        password_field = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.NAME, "password"))  # Adjust selector as needed
-        )
-        password_field.send_keys(password)
+            password_field = WebDriverWait(driver, 2).until(
+                EC.presence_of_element_located((By.NAME, "password"))
+            )
+            password_field.send_keys(password)
 
-        login_button = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//button[@type='submit']"))  # Adjust selector as needed
-        )
-        login_button.click()
+            login_button = WebDriverWait(driver, 1).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[@type='submit']"))
+            )
+            login_button.click()
 
-        WebDriverWait(driver, 10).until(EC.url_changes(url))
+            WebDriverWait(driver, 10).until(EC.url_changes(url))
 
-        # Check if the URL contains the specific text
-        current_url = driver.current_url
-        if "https://www.instagram.com/auth_platform/codeentry" in current_url:
-            print("On the verification page, waiting longer...")
-            WebDriverWait(driver, 120).until(EC.url_changes(current_url))
+            current_url = driver.current_url
+            if "https://www.instagram.com/auth_platform/codeentry" in current_url:
+                print("On the verification page, waiting longer...")
+                WebDriverWait(driver, 120).until(EC.url_changes(current_url))
 
-    print("Getting user's profile...")
-    get_profile(users, driver)
+        print("Getting user's profile...")
+        get_profile(users, post_count, driver)
+    except Exception as e:
+        print(f"Error waiting for the page to load: {e}")
+        driver.quit()
 
 
 if __name__ == "__main__":
