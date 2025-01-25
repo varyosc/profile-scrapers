@@ -63,14 +63,15 @@ def get_profile(users: List[str], post_count, driver=None):
             # Reset the post to get the amount you want than, get them
             posts = posts[:post_count]
             for i, img in enumerate(posts):
-                WebDriverWait(driver, 2).until(element_to_be_clickable(img))
+                WebDriverWait(driver, 6).until(EC.element_to_be_clickable(img))
                 img.screenshot(f"p{i}_{image_path}")
                 post_alts.append(img.get_attribute("alt"))
         if "https" in image_url:
             try:
                 driver.get(image_url)
-                time.sleep(1)
-                driver.save_screenshot(image_path)
+                WebDriverWait(driver, 4).until(EC.presence_of_element_located((By.XPATH, "//body/img")))
+                picture = driver.find_element(By.XPATH, "body/img")
+                picture.screenshot(image_path)
 
                 with Image.open(image_path) as img:
                     img = img.resize((400, 400))
