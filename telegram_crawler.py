@@ -13,7 +13,7 @@ from utils import generate_file, use_driver
 app = typer.Typer()
 
 
-@app.command()
+@app.command("get")
 def get_profile(users: List[str], driver=None):
     """Get a list of user profiles and return their bio and profile
     image if any telegram account exists for them
@@ -155,45 +155,37 @@ def get_profile(users: List[str], driver=None):
             ".person"
         )
         chat.click()
-        time.sleep(2)
-        profile = driver.execute_script(
-            """const avatarImages = document.querySelectorAll('.profile-avatars-avatar img.avatar-photo');
-            const avatarImageSources = Array.from(avatarImages).map(img => img.src);
-                const bioElement = document.querySelector('.row-title.pre-wrap');
-                const bioText = bioElement ? bioElement.innerText : 'Bio not found';
-
-                const result = {
-                        avatarImages: avatarImageSources,
-                        bio: bioText
-                        };
-                return result;"""
-        )
-        # Get all profile images that are found
-        for i in range(len(profile['avatarImages'])):
-            WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH,
-                                            f"//div[@class='avatar avatar-like avatar-full"
-                                            + " avatar-gradient profile-avatars-avatar-first']"
-                                            + "/img[@class='avatar-photo']")))
-            img = driver.find_element(
+        WebDriverWait(driver, 60).until(
+            EC.element_to_be_clickable((
                 By.XPATH,
-                f"//div[@class='avatar avatar-like avatar-full"
-                + " avatar-gradient profile-avatars-avatar-first']"
-            )
-            try:
-                img.click()
-            except Exception as e:
-                print("selenium error, image will be lower quality! ", e)
-            finally:
-                print("")
-            time.sleep(.7)
-            img.screenshot(f'{user_id}_{i}.png')
+                "//div/div[@class='row-title pre-wrap']"
+        )))
+        bio = driver.find_element(By.XPATH,
+                "//div/div[@class='row-title pre-wrap']").text
+        WebDriverWait(driver, 5).until(
+            EC.element_to_be_clickable((By.XPATH,
+                                        f"//div[@class='avatar avatar-like avatar-full"
+                                        + " avatar-gradient profile-avatars-avatar-first']"
+                                        + "/img[@class='avatar-photo']")))
+        img = driver.find_element(
+            By.XPATH,
+            f"//div[@class='avatar avatar-like avatar-full"
+            + " avatar-gradient profile-avatars-avatar-first']"
+        )
+        try:
+            img.click()
+        except Exception as e:
+            print("selenium error, image will be lower quality! ", e)
+        finally:
+            print("")
+        time.sleep(.7)
+        img.screenshot(f'{user_id}.png')
         # Save all the user's info
-        generate_file(user_id, file_name, [profile['bio'], f'{user_id}.png'])
+        generate_file(user_id, file_name, [bio, f'{user_id}.png'])
         driver.quit()
 
 
-@app.command()
+@app.command("login")
 def login(users: List[str]):
     driver = use_driver()
     url = "https://web.telegram.org/k"

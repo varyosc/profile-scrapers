@@ -14,7 +14,6 @@ app = typer.Typer()
 
 @app.command("get")
 def get_profile(users: List[str], driver):
-
     for user_id in users:
         try:
             if re.search(r"^\d{11}", str(int(user_id))):
