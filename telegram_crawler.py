@@ -4,6 +4,8 @@ import time
 from typing import List
 
 import typer
+from selenium.common import ElementNotInteractableException
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -131,9 +133,12 @@ def get_profile(users: List[str], driver=None):
                         print("no account for user: " + user_id, "\r\nmessage: ", e)
                         continue
 
+                else:
+                    raise Exception("Incorrect phone number or searching by id...")
+
 
             except Exception as e:
-                print("getting user by id ", e)
+                print(e)
                 url = f'https://web.telegram.org/k/#?tgaddr=tg%3A%2F%2Fresolve%3Fdomain%3D{user_id}'
                 driver.get(url)
 
@@ -173,26 +178,38 @@ def get_profile(users: List[str], driver=None):
             print(f"Getting {user_id}'s profile avatar...")
             try:
                 WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable(
+                    EC.presence_of_element_located(
                         (By.XPATH,
-                         f"//div[@class='avatar avatar-like avatar-full"
-                         + " avatar-gradient profile-avatars-avatar-first']"
-                         + "/img[@class='avatar-photo']")))
+                         "//div[@class='profile-avatars-avatars']/div//img")))
                 img = driver.find_element(
                     By.XPATH,
-                    f"//div[@class='avatar avatar-like avatar-full"
-                    + " avatar-gradient profile-avatars-avatar-first']"
+                    "//div[@class='profile-pinned-gifts']"
                 )
                 img.click()
                 time.sleep(.7)
                 img.click()
-                WebDriverWait(driver, 5).until(
-                    EC.presence_of_element_located(
-                        (By.XPATH, "//img[@class='thumbnail']")))
-                full_image = driver.find_element(By.XPATH, "//img[@class='thumbnail']")
-                full_image.screenshot(img_path)
+                try:
+                    WebDriverWait(driver, 5).until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, "//img[@class='thumbnail']")))
+                    full_image = driver.find_element(By.XPATH, "//img[@class='thumbnail']")
+                    full_image.screenshot(img_path)
+                except TimeoutException:
+                    print("Low quality image!")
+                    img = driver.find_element(
+                        By.XPATH,
+                        "//div[@class='profile-avatars-avatars']/div//img"
+                    )
+                    img.screenshot(img_path)
+            except ElementNotInteractableException:
+                print("Low quality image!")
+                img = driver.find_element(
+                    By.XPATH,
+                    "//div[@class='profile-avatars-avatars']/div"
+                )
+                img.screenshot(img_path)
             except Exception as e:
-                print("low quality image or no image is set! ", e)
+                print("No image is set! ", e)
                 img_path = os.path.join(
                     os.getcwd(),
                     "telegram",

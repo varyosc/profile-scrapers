@@ -4,6 +4,7 @@ import time
 from typing import List
 
 import typer
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -27,7 +28,8 @@ def get_profile(users: List[str], driver):
                 else:
                     raise ValueError()
             except ValueError:
-                print("please inter a valid phone number...")
+                print("please inter a valid phone number for: ", user_id)
+                continue
             bio_xpath = "//section//span[@title]"
             image_object_xpath = "//section//img"
             profile_image_xpath = "//div[@class='_ajuf _ajuh']//img"
@@ -35,10 +37,21 @@ def get_profile(users: List[str], driver):
                    f'send/?phone={user_id}&text&type=phone_number&app_absent=0')
             driver.get(url)
             print("getting profile...")
-            WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//div[@title]/div")))
-            profile_object = driver.find_element(By.XPATH, "//div[@title]/div")
-            profile_object.click()
+            try:
+                WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, "//div[@title]/div")))
+                profile_object = driver.find_element(By.XPATH, "//div[@title]/div")
+                profile_object.click()
+
+            except TimeoutException:
+                if driver.find_elements(By.XPATH,
+                                        "//div[@aria-label='Phone number shared via url is invalid.']"):
+                    print(f"User with {user_id} phone number is not found...")
+                    continue
+                else:
+                    print("Timeout error getting profile: ", user_id)
+                    continue
+
             try:
                 WebDriverWait(driver, 4).until(
                     EC.presence_of_element_located((By.XPATH, bio_xpath)))
