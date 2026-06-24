@@ -1,4 +1,4 @@
-Pillow==11.2.1
-python-dotenv==1.1.0
+Pillow==12.2.0
+python-dotenv>=1.2.0
 selenium==4.32.0
 typer==0.15.3
